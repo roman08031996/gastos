@@ -277,9 +277,8 @@
   async function apiCall(action,payload={}){
     const url=new URL(SHEETS_URL);
     url.searchParams.set("action",action);
-    let response;
-    if(action==="getAll"){response=await fetch(url.toString())}
-    else{response=await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload})})}
+    Object.entries(payload).forEach(([k,v])=>url.searchParams.set(k,typeof v==="object"?JSON.stringify(v):v));
+    const response=await fetch(url.toString());
     if(!response.ok) throw new Error(`HTTP ${response.status}`);
     const data=await response.json();
     if(data.error) throw new Error(data.error);

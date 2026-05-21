@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0a0c14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GastosApp" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <title>GastosApp — Nuevo Gasto</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -207,19 +213,13 @@
     setTimeout(()=>{el.classList.remove("show");el.addEventListener("transitionend",()=>el.remove())},3200);
   }
 
-  const SHEETS_URL="https://script.google.com/macros/s/AKfycbxBi_2LnML9JiUH_FlIQQ-mvwSYWbYajw7lxa2UKBapD-jLaabhdqeoOfbq-9E8GVY1/exec";
-
   function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 
   async function crearGasto(data) {
     const gasto={id:genId(),tipo:data.tipo||"",categoria:data.categoria||"",subcategoria:data.subcategoria||"",
       quienGasto:data.quienGasto||"",monto:parseFloat(data.monto)||0,fecha:data.fecha||"",
       descripcion:data.descripcion||"",creadoEn:new Date().toISOString()};
-    const url=new URL(SHEETS_URL);url.searchParams.set("action","create");url.searchParams.set("gasto",JSON.stringify(gasto));
-    const response=await fetch(url.toString());
-    if(!response.ok) throw new Error(`HTTP ${response.status}`);
-    const result=await response.json();
-    if(result.error) throw new Error(result.error);
+    GastosDB.create(gasto);
     return gasto;
   }
 
@@ -326,6 +326,12 @@
     document.querySelectorAll(".is-invalid").forEach(el=>el.classList.remove("is-invalid"));
     document.querySelectorAll(".form-error").forEach(el=>el.style.display="none");
   }
+  </script>
+  <script src="app-storage.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(console.error);
+    }
   </script>
 </body>
 </html>

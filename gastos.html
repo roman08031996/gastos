@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0a0c14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GastosApp" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <title>GastosApp — Todos los Gastos</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -272,22 +278,8 @@
     setTimeout(()=>{el.classList.remove("show");el.addEventListener("transitionend",()=>el.remove())},3200);
   }
 
-  const SHEETS_URL="https://script.google.com/macros/s/AKfycbxBi_2LnML9JiUH_FlIQQ-mvwSYWbYajw7lxa2UKBapD-jLaabhdqeoOfbq-9E8GVY1/exec";
-
-  async function apiCall(action,payload={}){
-    const url=new URL(SHEETS_URL);
-    url.searchParams.set("action",action);
-    Object.entries(payload).forEach(([k,v])=>url.searchParams.set(k,typeof v==="object"?JSON.stringify(v):v));
-    const response=await fetch(url.toString());
-    if(!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data=await response.json();
-    if(data.error) throw new Error(data.error);
-    return data;
-  }
-
   async function obtenerTodos(){
-    const data=await apiCall("getAll");
-    return (data.gastos||[]).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    return GastosDB.getAll();
   }
 
   // ===== INIT =====
@@ -295,11 +287,10 @@
 
   let allGastos=[], filtered=[];
 
-  // Carga inicial y polling
+  // Carga inicial desde localStorage, sync en background
   (async function load(){
-    try{ allGastos=await obtenerTodos(); applyFilters(); }
+    try{ allGastos=await GastosDB.init(); applyFilters(); }
     catch(e){ console.error(e); }
-    setTimeout(load,30000);
   })();
 
   function initSidebar(){
@@ -406,7 +397,7 @@
     const btn=document.getElementById("btnEditSave");
     btn.disabled=true;btn.innerHTML='<span class="spinner-border"></span> Guardando...';
     try{
-      await apiCall("update",{id,gasto:{
+      GastosDB.update(id,{
         quienGasto:document.getElementById("editQuien").value,
         monto:parseFloat(document.getElementById("editMonto").value)||0,
         categoria:document.getElementById("editCategoria").value,
@@ -415,8 +406,8 @@
         tipo:document.getElementById("editTipo").value,
         descripcion:document.getElementById("editDescripcion").value,
         actualizadoEn:new Date().toISOString()
-      }});
-      allGastos=await obtenerTodos();
+      });
+      allGastos=obtenerTodos();
       applyFilters();
       closeEditModal();
       showToast("Gasto actualizado correctamente","success");
@@ -436,8 +427,8 @@
     const btn=document.getElementById("btnConfirmDelete");
     btn.disabled=true;btn.innerHTML='<span class="spinner-border"></span> Eliminando...';
     try{
-      await apiCall("delete",{id});
-      allGastos=await obtenerTodos();
+      GastosDB.delete(id);
+      allGastos=obtenerTodos();
       applyFilters();
       closeDeleteModal();
       showToast("Gasto eliminado","warn");
@@ -452,6 +443,12 @@
   // Cerrar modales clickeando el overlay
   document.getElementById("editOverlay").addEventListener("click",e=>{if(e.target===e.currentTarget)closeEditModal()});
   document.getElementById("deleteOverlay").addEventListener("click",e=>{if(e.target===e.currentTarget)closeDeleteModal()});
+  </script>
+  <script src="app-storage.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(console.error);
+    }
   </script>
 </body>
 </html>

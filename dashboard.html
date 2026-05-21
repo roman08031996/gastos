@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0a0c14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GastosApp" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <title>GastosApp — Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -248,40 +254,8 @@
   }
 
   // ===== GOOGLE SHEETS API =====
-  const SHEETS_URL = "https://script.google.com/macros/s/AKfycbxBi_2LnML9JiUH_FlIQQ-mvwSYWbYajw7lxa2UKBapD-jLaabhdqeoOfbq-9E8GVY1/exec";
-
-  async function apiCall(action, payload={}) {
-    const url = new URL(SHEETS_URL);
-    url.searchParams.set("action", action);
-    let response;
-    if (action === "getAll") {
-      response = await fetch(url.toString());
-    } else {
-      response = await fetch(SHEETS_URL, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({action, ...payload})
-      });
-    }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    if (data.error) throw new Error(data.error);
-    return data;
-  }
-
   async function obtenerTodos() {
-    const data = await apiCall("getAll");
-    return (data.gastos||[]).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  }
-
-  function suscribirGastos(callback) {
-    let cancelled = false;
-    async function poll() {
-      if (cancelled) return;
-      try { callback(await obtenerTodos()); } catch(err) { console.error("Error:",err); }
-      if (!cancelled) setTimeout(poll, 30000);
-    }
-    poll();
-    return ()=>{ cancelled=true; };
+    return GastosDB.getAll();
   }
 
   // ===== DASHBOARD =====
@@ -291,7 +265,17 @@
   selectedYear=now.getFullYear(); selectedMonth=now.getMonth()+1;
 
   initSidebar(); initUserBadge(); buildMonthPicker(); updateTopbarMonth();
-  suscribirGastos(gastos=>{ allGastos=gastos; renderDashboard(); });
+
+  // Carga desde localStorage al instante, sync en background
+  (async function init(){
+    allGastos = await GastosDB.init();
+    renderDashboard();
+    // Refrescar pantalla cuando sync termine
+    window.addEventListener("gastosUpdated", ()=>{
+      allGastos = GastosDB.getAll();
+      renderDashboard();
+    });
+  })();
 
   function initSidebar() {
     const sidebar=document.getElementById("sidebar"),overlay=document.getElementById("sidebarOverlay"),
@@ -415,6 +399,12 @@
       </div>`;
     }).join("");
   }
+  </script>
+  <script src="app-storage.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(console.error);
+    }
   </script>
 </body>
 </html>

@@ -179,8 +179,8 @@
   <script>
   // ===== CONFIG =====
   const APP_CONFIG = {
-    usuarios: ["Usuario 1", "Usuario 2"],
-    coloresUsuarios: { "Usuario 1": "#6C63FF", "Usuario 2": "#F59E0B" },
+    usuarios: ["Juani", "Roman"],
+    coloresUsuarios: { "Juani": "#6C63FF", "Roman": "#F59E0B" },
     categorias: {
       "Vivienda":     { icon:"bi-house-fill",       color:"#6C63FF", subcategorias:["Alquiler","Expensas","Servicios","Internet","Limpieza","Mantenimiento"] },
       "Alimentación": { icon:"bi-cart-fill",         color:"#10b981", subcategorias:["Supermercado","Verdulería","Carnicería","Almacén","Delivery","Restaurante"] },
@@ -215,11 +215,7 @@
     const gasto={id:genId(),tipo:data.tipo||"",categoria:data.categoria||"",subcategoria:data.subcategoria||"",
       quienGasto:data.quienGasto||"",monto:parseFloat(data.monto)||0,fecha:data.fecha||"",
       descripcion:data.descripcion||"",creadoEn:new Date().toISOString()};
-    // GET con query string: sin preflight CORS y sin confusión de postData en GAS
-    const url=new URL(SHEETS_URL);
-    url.searchParams.set("action","create");
-    url.searchParams.set("gasto",JSON.stringify(gasto));
-    const response=await fetch(url.toString());
+    const response=await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"create",gasto})});
     if(!response.ok) throw new Error(`HTTP ${response.status}`);
     const result=await response.json();
     if(result.error) throw new Error(result.error);

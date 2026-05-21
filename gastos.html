@@ -279,7 +279,7 @@
     setTimeout(()=>{el.classList.remove("show");el.addEventListener("transitionend",()=>el.remove())},3200);
   }
 
-  async function obtenerTodos(){
+  function obtenerTodos(){
     return GastosDB.getAll();
   }
 
@@ -293,6 +293,11 @@
     try{ allGastos=await GastosDB.init(); applyFilters(); }
     catch(e){ console.error(e); }
   })();
+
+  window.addEventListener("gastosUpdated", () => {
+    allGastos = GastosDB.getAll();
+    applyFilters();
+  });
 
   function initSidebar(){
     const sidebar=document.getElementById("sidebar"),overlay=document.getElementById("sidebarOverlay"),
@@ -408,7 +413,7 @@
         descripcion:document.getElementById("editDescripcion").value,
         actualizadoEn:new Date().toISOString()
       });
-      allGastos=obtenerTodos();
+      allGastos = GastosDB.getAll();
       applyFilters();
       closeEditModal();
       showToast("Gasto actualizado correctamente","success");
@@ -429,7 +434,7 @@
     btn.disabled=true;btn.innerHTML='<span class="spinner-border"></span> Eliminando...';
     try{
       GastosDB.delete(id);
-      allGastos=obtenerTodos();
+      allGastos = GastosDB.getAll();
       applyFilters();
       closeDeleteModal();
       showToast("Gasto eliminado","warn");

@@ -215,7 +215,8 @@
     const gasto={id:genId(),tipo:data.tipo||"",categoria:data.categoria||"",subcategoria:data.subcategoria||"",
       quienGasto:data.quienGasto||"",monto:parseFloat(data.monto)||0,fecha:data.fecha||"",
       descripcion:data.descripcion||"",creadoEn:new Date().toISOString()};
-    const response=await fetch(SHEETS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"create",gasto})});
+    const url=new URL(SHEETS_URL);url.searchParams.set("action","create");url.searchParams.set("gasto",JSON.stringify(gasto));
+    const response=await fetch(url.toString());
     if(!response.ok) throw new Error(`HTTP ${response.status}`);
     const result=await response.json();
     if(result.error) throw new Error(result.error);

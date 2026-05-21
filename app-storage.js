@@ -147,18 +147,28 @@ async function _syncFromSheets() {
     const data   = await _sheetsCall("getAll");
     const remote = data.gastos || [];
 
-    // Mantener versiones locales de IDs que están en la queue (sin sobreescribir)
-    const queue     = _Store.getQueue();
-    const queueIds  = new Set(queue.map(op => op.id).filter(Boolean));
-    const local     = _Store.getGastos();
-    const localMap  = Object.fromEntries(local.map(g => [g.id, g]));
-    const remoteIds = new Set(remote.map(g => g.id));
+    // Merge sin duplicados: usar Map keyed por ID.
+    // Remote es la fuente de verdad, excepto para IDs con cambios pendientes
+    // donde la versión local gana (para no sobreescribir edits offline).
+    const queue    = _Store.getQueue();
+    const queueIds = new Set(queue.map(op => op.id).filter(Boolean));
+    const local    = _Store.getGastos();
+    const localMap = Object.fromEntries(local.map(g => [g.id, g]));
 
-    const merged = remote.map(g =>
-      queueIds.has(g.id) && localMap[g.id] ? localMap[g.id] : g
-    );
-    // Agregar gastos locales aún no subidos (recién creados pendientes)
-    local.forEach(g => { if (!remoteIds.has(g.id)) merged.push(g); });
+    // Construir mapa de resultado: base = remote
+    const mergeMap = new Map(remote.map(g => [g.id, g]));
+
+    // Sobreescribir con versión local para IDs con cambios pendientes
+    queueIds.forEach(id => {
+      if (localMap[id]) mergeMap.set(id, localMap[id]);
+    });
+
+    // Agregar gastos locales que aún no llegaron a remote (pendientes de create)
+    local.forEach(g => {
+      if (!mergeMap.has(g.id)) mergeMap.set(g.id, g);
+    });
+
+    const merged = Array.from(mergeMap.values());
 
     _Store.setGastos(merged);
     _Store.setLastSync();
@@ -219,9 +229,18 @@ const GastosDB = {
    */
   create(gasto) {
     const gastos = _Store.getGastos();
+    // Guardia: nunca insertar el mismo ID dos veces en local
+    if (gastos.some(g => g.id === gasto.id)) {
+      console.warn("GastosDB.create: ID duplicado ignorado", gasto.id);
+      return gasto;
+    }
     gastos.push(gasto);
     _Store.setGastos(gastos);
-    _Store.addToQueue({ action: "create", gasto });
+    // Guardia: no encolar el mismo create dos veces
+    const queue = _Store.getQueue();
+    if (!queue.some(op => op.action === "create" && op.gasto?.id === gasto.id)) {
+      _Store.addToQueue({ action: "create", gasto });
+    }
     _setSyncStatus("pending");
     _scheduleFlush();
     window.dispatchEvent(new CustomEvent("gastosUpdated"));

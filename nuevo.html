@@ -182,6 +182,7 @@
     </main>
   </div>
 
+  <script src="app-storage.js"></script>
   <script>
   // ===== CONFIG =====
   const APP_CONFIG = {
@@ -213,7 +214,7 @@
     setTimeout(()=>{el.classList.remove("show");el.addEventListener("transitionend",()=>el.remove())},3200);
   }
 
-  function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+  function genId(){try{return crypto.randomUUID().replace(/-/g,"").slice(0,16)}catch{return Date.now().toString(36)+Math.random().toString(36).slice(2,9)+Math.random().toString(36).slice(2,9)}}
 
   async function crearGasto(data) {
     const gasto={id:genId(),tipo:data.tipo||"",categoria:data.categoria||"",subcategoria:data.subcategoria||"",
@@ -275,8 +276,11 @@
   document.getElementById("monto")?.addEventListener("input",updatePreview);
   document.getElementById("categoria")?.addEventListener("change",updatePreview);
 
+  let _submitting = false;
   async function submitForm(){
     if(!validate()) return;
+    if(_submitting) return;
+    _submitting = true;
     const btn=document.getElementById("btnSubmit");
     btn.disabled=true;
     btn.innerHTML='<span class="spinner-border"></span> Guardando...';
@@ -297,6 +301,7 @@
       showToast("Error al guardar. Verificá la conexión con la hoja.","error");
       btn.disabled=false;
       btn.innerHTML='<i class="bi bi-check-lg"></i> Guardar gasto';
+      _submitting = false;
     }
   }
 
@@ -327,7 +332,6 @@
     document.querySelectorAll(".form-error").forEach(el=>el.style.display="none");
   }
   </script>
-  <script src="app-storage.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(console.error);

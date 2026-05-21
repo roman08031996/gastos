@@ -211,6 +211,7 @@
   <a href="nuevo.html" class="fab" title="Nuevo gasto"><i class="bi bi-plus-lg"></i></a>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="app-storage.js"></script>
   <script>
   // ===== CONFIG =====
   const APP_CONFIG = {
@@ -400,8 +401,7 @@
     }).join("");
   }
   </script>
-  <script src="app-storage.js"></script>
-  <script>
+    <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(console.error);
     }

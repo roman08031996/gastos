@@ -135,6 +135,7 @@
 
   <a href="nuevo.html" class="fab" title="Nuevo gasto"><i class="bi bi-plus-lg"></i></a>
 
+  <script src="app-storage.js"></script>
   <script>
   const APP_CONFIG = {
     usuarios: ["Juani", "Roman"],
@@ -251,8 +252,7 @@
     }).join("");
   }
   </script>
-  <script src="app-storage.js"></script>
-  <script>
+    <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(console.error);
     }

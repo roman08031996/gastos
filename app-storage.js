@@ -1,90 +1,86 @@
 /**
- * GastosApp — Storage & Sync Engine
- * - localStorage como fuente principal (respuesta instantánea)
- * - Sync con Google Sheets en background cada 10 minutos
- * - Cola de cambios pendientes para cuando no hay conexión
- * - Indicador visual de estado de sync
+ * GastosApp — app-storage.js
+ * localStorage como fuente principal (respuesta instantánea)
+ * Sync con Google Sheets en background cada 10 minutos
+ * Cola de cambios pendientes para cuando no hay conexión
+ * Indicador visual de estado de sync
  */
 
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbxBi_2LnML9JiUH_FlIQQ-mvwSYWbYajw7lxa2UKBapD-jLaabhdqeoOfbq-9E8GVY1/exec";
-const LS_GASTOS    = "gastosapp_gastos";
-const LS_QUEUE     = "gastosapp_queue";
-const LS_LAST_SYNC = "gastosapp_last_sync";
+const SHEETS_URL    = "https://script.google.com/macros/s/AKfycbxBi_2LnML9JiUH_FlIQQ-mvwSYWbYajw7lxa2UKBapD-jLaabhdqeoOfbq-9E8GVY1/exec";
+const LS_GASTOS     = "gastosapp_gastos";
+const LS_QUEUE      = "gastosapp_queue";
+const LS_LAST_SYNC  = "gastosapp_last_sync";
 const SYNC_INTERVAL = 10 * 60 * 1000; // 10 minutos
 
 // ─── Indicador de sync ────────────────────────────────────────────────────────
-function injectSyncIndicator() {
+function _injectSyncUI() {
   if (document.getElementById("syncIndicator")) return;
+
+  // Keyframe pulse
+  if (!document.getElementById("syncStyles")) {
+    const s = document.createElement("style");
+    s.id = "syncStyles";
+    s.textContent = `@keyframes syncPulse { 0%,100%{opacity:1} 50%{opacity:.3} }`;
+    document.head.appendChild(s);
+  }
+
   const el = document.createElement("div");
   el.id = "syncIndicator";
-  el.innerHTML = `<i class="bi bi-circle-fill" id="syncDot"></i> <span id="syncLabel">Sincronizado</span>`;
-  el.style.cssText = `
-    position:fixed;bottom:16px;right:16px;z-index:9999;
-    display:flex;align-items:center;gap:6px;
-    background:#141826;border:1px solid #2a3050;border-radius:40px;
-    padding:6px 12px;font-size:12px;font-family:'Sora',sans-serif;
-    color:#94a3b8;box-shadow:0 4px 20px rgba(0,0,0,.4);
-    transition:opacity 0.4s;opacity:0;pointer-events:none;
-  `;
+  el.innerHTML = `<i class="bi bi-circle-fill" id="syncDot" style="font-size:8px"></i><span id="syncLabel">Sincronizado</span>`;
+  el.style.cssText = [
+    "position:fixed", "bottom:16px", "right:16px", "z-index:9999",
+    "display:flex", "align-items:center", "gap:6px",
+    "background:#141826", "border:1px solid #2a3050", "border-radius:40px",
+    "padding:6px 14px", "font-size:12px", "font-family:'Sora',sans-serif",
+    "color:#94a3b8", "box-shadow:0 4px 20px rgba(0,0,0,.4)",
+    "transition:opacity 0.4s", "opacity:0", "pointer-events:none"
+  ].join(";");
   document.body.appendChild(el);
 }
 
-function setSyncStatus(status) {
-  // status: 'syncing' | 'ok' | 'pending' | 'error'
+function _setSyncStatus(status) {
+  // Inyectar UI si todavía no existe (llamada temprana antes de DOMContentLoaded)
+  if (!document.getElementById("syncIndicator")) _injectSyncUI();
+
   const dot   = document.getElementById("syncDot");
   const label = document.getElementById("syncLabel");
   const ind   = document.getElementById("syncIndicator");
   if (!dot || !label || !ind) return;
 
-  const map = {
-    syncing: { color: "#6C63FF", text: "Sincronizando...", show: true  },
-    ok:      { color: "#10b981", text: "Sincronizado",     show: true  },
-    pending: { color: "#F59E0B", text: "Cambios pendientes", show: true },
-    error:   { color: "#ef4444", text: "Sin conexión",     show: true  },
-  };
-  const cfg = map[status] || map.ok;
-  dot.style.color   = cfg.color;
-  dot.style.fontSize = status === "syncing" ? "8px" : "8px";
-  label.textContent = cfg.text;
-  ind.style.opacity = "1";
+  const cfg = {
+    syncing: { color: "#6C63FF", text: "Sincronizando...", pulse: true  },
+    ok:      { color: "#10b981", text: "Sincronizado",     pulse: false },
+    pending: { color: "#F59E0B", text: "Cambios pendientes",pulse: false },
+    error:   { color: "#ef4444", text: "Sin conexión",     pulse: false },
+  }[status] || { color: "#10b981", text: "Sincronizado", pulse: false };
 
-  if (status === "syncing") {
-    dot.style.animation = "syncPulse 1s infinite";
-  } else {
-    dot.style.animation = "none";
-    if (status === "ok") {
-      setTimeout(() => { if (ind) ind.style.opacity = "0"; }, 3000);
-    }
+  dot.style.color     = cfg.color;
+  dot.style.animation = cfg.pulse ? "syncPulse 1s infinite" : "none";
+  label.textContent   = cfg.text;
+  ind.style.opacity   = "1";
+
+  if (status === "ok") {
+    setTimeout(() => { if (ind) ind.style.opacity = "0"; }, 3000);
   }
 }
 
-// Inyectar keyframe de pulse
-(function injectStyles() {
-  if (document.getElementById("syncStyles")) return;
-  const s = document.createElement("style");
-  s.id = "syncStyles";
-  s.textContent = `@keyframes syncPulse { 0%,100%{opacity:1} 50%{opacity:.3} }`;
-  document.head.appendChild(s);
-})();
-
 // ─── localStorage helpers ─────────────────────────────────────────────────────
-const Store = {
+const _Store = {
   getGastos() {
     try { return JSON.parse(localStorage.getItem(LS_GASTOS) || "[]"); }
     catch { return []; }
   },
-  setGastos(gastos) {
-    localStorage.setItem(LS_GASTOS, JSON.stringify(gastos));
+  setGastos(arr) {
+    localStorage.setItem(LS_GASTOS, JSON.stringify(arr));
   },
   getQueue() {
     try { return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]"); }
     catch { return []; }
   },
   addToQueue(op) {
-    const q = Store.getQueue();
+    const q = _Store.getQueue();
     q.push({ ...op, ts: Date.now() });
     localStorage.setItem(LS_QUEUE, JSON.stringify(q));
-    setSyncStatus("pending");
   },
   clearQueue() {
     localStorage.removeItem(LS_QUEUE);
@@ -96,12 +92,12 @@ const Store = {
     localStorage.setItem(LS_LAST_SYNC, Date.now().toString());
   },
   needsSync() {
-    return (Date.now() - Store.getLastSync()) > SYNC_INTERVAL;
+    return (Date.now() - _Store.getLastSync()) > SYNC_INTERVAL;
   }
 };
 
-// ─── API helper (siempre GET querystring, sin preflight) ─────────────────────
-async function sheetsCall(action, payload = {}) {
+// ─── API helper — siempre GET querystring para evitar preflight CORS ──────────
+async function _sheetsCall(action, payload = {}) {
   const url = new URL(SHEETS_URL);
   url.searchParams.set("action", action);
   Object.entries(payload).forEach(([k, v]) =>
@@ -114,148 +110,87 @@ async function sheetsCall(action, payload = {}) {
   return data;
 }
 
-// ─── Sync: bajar todo de Sheets y mergear ────────────────────────────────────
-async function syncFromSheets() {
-  if (!navigator.onLine) { setSyncStatus("error"); return; }
-  setSyncStatus("syncing");
-  try {
-    const data = await sheetsCall("getAll");
-    const remote = data.gastos || [];
-
-    // Mergear: local gana sobre remote para IDs que están en la queue
-    const queue  = Store.getQueue();
-    const queueIds = new Set(queue.map(op => op.id).filter(Boolean));
-    const local  = Store.getGastos();
-    const localMap = Object.fromEntries(local.map(g => [g.id, g]));
-
-    // Tomar remote como base, sobreescribir con versiones locales pendientes
-    const merged = remote.map(g => queueIds.has(g.id) && localMap[g.id] ? localMap[g.id] : g);
-    // Agregar gastos locales que no existen en remote aún (recién creados pendientes)
-    const remoteIds = new Set(remote.map(g => g.id));
-    local.forEach(g => { if (!remoteIds.has(g.id)) merged.push(g); });
-
-    Store.setGastos(merged);
-    Store.setLastSync();
-    setSyncStatus("ok");
-    window.dispatchEvent(new CustomEvent("gastosUpdated"));
-  } catch (e) {
-    console.warn("Sync error:", e);
-    setSyncStatus("error");
-  }
-}
-
-// ─── Flush queue: enviar operaciones pendientes a Sheets ─────────────────────
-async function flushQueue() {
+// ─── Flush: enviar operaciones pendientes a Sheets ────────────────────────────
+async function _flushQueue() {
   if (!navigator.onLine) return;
-  const queue = Store.getQueue();
+  const queue = _Store.getQueue();
   if (queue.length === 0) return;
 
-  setSyncStatus("syncing");
+  _setSyncStatus("syncing");
   const failed = [];
+
   for (const op of queue) {
     try {
-      if (op.action === "create") {
-        await sheetsCall("create", { gasto: op.gasto });
-      } else if (op.action === "update") {
-        await sheetsCall("update", { id: op.id, gasto: op.gasto });
-      } else if (op.action === "delete") {
-        await sheetsCall("delete", { id: op.id });
-      }
-    } catch (e) {
+      if      (op.action === "create") await _sheetsCall("create", { gasto: op.gasto });
+      else if (op.action === "update") await _sheetsCall("update", { id: op.id, gasto: op.gasto });
+      else if (op.action === "delete") await _sheetsCall("delete", { id: op.id });
+    } catch {
       failed.push(op);
     }
   }
 
   if (failed.length === 0) {
-    Store.clearQueue();
-    Store.setLastSync();
-    setSyncStatus("ok");
+    _Store.clearQueue();
+    _Store.setLastSync();
+    _setSyncStatus("ok");
   } else {
     localStorage.setItem(LS_QUEUE, JSON.stringify(failed));
-    setSyncStatus("error");
+    _setSyncStatus("error");
   }
 }
 
-// ─── Operaciones CRUD (instantáneas en local + encolan para Sheets) ───────────
-const GastosDB = {
-  getAll() {
-    return Store.getGastos().sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
-  },
+// ─── Sync: bajar todo de Sheets y actualizar caché ───────────────────────────
+async function _syncFromSheets() {
+  if (!navigator.onLine) { _setSyncStatus("error"); return; }
+  _setSyncStatus("syncing");
+  try {
+    const data   = await _sheetsCall("getAll");
+    const remote = data.gastos || [];
 
-  create(gasto) {
-    const gastos = Store.getGastos();
-    gastos.push(gasto);
-    Store.setGastos(gastos);
-    Store.addToQueue({ action: "create", gasto });
-    scheduleFlush();
-    return gasto;
-  },
+    // Mantener versiones locales de IDs que están en la queue (sin sobreescribir)
+    const queue     = _Store.getQueue();
+    const queueIds  = new Set(queue.map(op => op.id).filter(Boolean));
+    const local     = _Store.getGastos();
+    const localMap  = Object.fromEntries(local.map(g => [g.id, g]));
+    const remoteIds = new Set(remote.map(g => g.id));
 
-  update(id, changes) {
-    const gastos = Store.getGastos();
-    const idx = gastos.findIndex(g => g.id === id);
-    if (idx === -1) throw new Error("Gasto no encontrado");
-    gastos[idx] = { ...gastos[idx], ...changes };
-    Store.setGastos(gastos);
-    Store.addToQueue({ action: "update", id, gasto: gastos[idx] });
-    scheduleFlush();
-    return gastos[idx];
-  },
+    const merged = remote.map(g =>
+      queueIds.has(g.id) && localMap[g.id] ? localMap[g.id] : g
+    );
+    // Agregar gastos locales aún no subidos (recién creados pendientes)
+    local.forEach(g => { if (!remoteIds.has(g.id)) merged.push(g); });
 
-  delete(id) {
-    const gastos = Store.getGastos().filter(g => g.id !== id);
-    Store.setGastos(gastos);
-    Store.addToQueue({ action: "delete", id });
-    scheduleFlush();
-  },
-
-  // Carga inicial: usa local si es fresco, sino sincroniza
-  async init() {
-    injectSyncIndicator();
-    const local = Store.getGastos();
-
-    if (local.length > 0 && !Store.needsSync()) {
-      // Datos frescos en local, usar directo
-      const pending = Store.getQueue().length;
-      if (pending > 0) {
-        setSyncStatus("pending");
-        scheduleFlush();
-      }
-      return local;
-    }
-
-    // Sin datos locales o pasaron 10 min → sincronizar
-    await flushQueue();   // primero enviar pendientes
-    await syncFromSheets(); // luego bajar actualizados
-    return Store.getGastos();
+    _Store.setGastos(merged);
+    _Store.setLastSync();
+    _setSyncStatus("ok");
+    window.dispatchEvent(new CustomEvent("gastosUpdated"));
+  } catch (err) {
+    console.warn("GastosApp sync error:", err);
+    _setSyncStatus("error");
   }
-};
+}
 
 // ─── Flush diferido (evita spam de requests) ─────────────────────────────────
-let flushTimer = null;
-function scheduleFlush(delay = 2000) {
-  clearTimeout(flushTimer);
-  flushTimer = setTimeout(flushQueue, delay);
+let _flushTimer = null;
+function _scheduleFlush(delay = 2000) {
+  clearTimeout(_flushTimer);
+  _flushTimer = setTimeout(_flushQueue, delay);
 }
 
 // ─── Sync automático cada 10 minutos ─────────────────────────────────────────
 setInterval(async () => {
-  await flushQueue();
-  await syncFromSheets();
+  await _flushQueue();
+  await _syncFromSheets();
 }, SYNC_INTERVAL);
 
-// ─── Sync al volver online ────────────────────────────────────────────────────
-window.addEventListener("online", async () => {
-  await flushQueue();
-  await syncFromSheets();
-});
-window.addEventListener("offline", () => setSyncStatus("error"));
+// ─── Sync al recuperar conexión ───────────────────────────────────────────────
+window.addEventListener("online",  async () => { await _flushQueue(); await _syncFromSheets(); });
+window.addEventListener("offline", ()        => _setSyncStatus("error"));
 
-// ─── Flush antes de cerrar la pestaña ────────────────────────────────────────
+// ─── Flush de último recurso al cerrar la pestaña ────────────────────────────
 window.addEventListener("beforeunload", () => {
-  const queue = Store.getQueue();
+  const queue = _Store.getQueue();
   if (queue.length > 0 && navigator.onLine) {
-    // Sync síncrono de último recurso (best-effort)
     queue.forEach(op => {
       const url = new URL(SHEETS_URL);
       url.searchParams.set("action", op.action);
@@ -265,3 +200,98 @@ window.addEventListener("beforeunload", () => {
     });
   }
 });
+
+// ─── GastosDB — API pública ───────────────────────────────────────────────────
+const GastosDB = {
+
+  /**
+   * Devuelve todos los gastos ordenados por fecha desc (síncrono, desde caché).
+   */
+  getAll() {
+    return _Store.getGastos().sort((a, b) =>
+      (b.fecha || "").localeCompare(a.fecha || "")
+    );
+  },
+
+  /**
+   * Crea un gasto nuevo.
+   * Escribe en localStorage al instante y encola el sync con Sheets.
+   */
+  create(gasto) {
+    const gastos = _Store.getGastos();
+    gastos.push(gasto);
+    _Store.setGastos(gastos);
+    _Store.addToQueue({ action: "create", gasto });
+    _setSyncStatus("pending");
+    _scheduleFlush();
+    window.dispatchEvent(new CustomEvent("gastosUpdated"));
+    return gasto;
+  },
+
+  /**
+   * Actualiza un gasto existente por id.
+   */
+  update(id, changes) {
+    const gastos = _Store.getGastos();
+    const idx    = gastos.findIndex(g => g.id === id);
+    if (idx === -1) throw new Error("Gasto no encontrado: " + id);
+    gastos[idx] = { ...gastos[idx], ...changes };
+    _Store.setGastos(gastos);
+    _Store.addToQueue({ action: "update", id, gasto: gastos[idx] });
+    _setSyncStatus("pending");
+    _scheduleFlush();
+    window.dispatchEvent(new CustomEvent("gastosUpdated"));
+    return gastos[idx];
+  },
+
+  /**
+   * Elimina un gasto por id.
+   */
+  delete(id) {
+    _Store.setGastos(_Store.getGastos().filter(g => g.id !== id));
+    _Store.addToQueue({ action: "delete", id });
+    _setSyncStatus("pending");
+    _scheduleFlush();
+    window.dispatchEvent(new CustomEvent("gastosUpdated"));
+  },
+
+  /**
+   * Inicialización asíncrona.
+   * - Si hay datos frescos en localStorage: los devuelve de inmediato
+   *   y lanza sync en background.
+   * - Si localStorage está vacío o los datos tienen >10 min:
+   *   espera la sync y devuelve los datos actualizados.
+   */
+  async init() {
+    // Inyectar UI de sync en cuanto el DOM esté listo
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", _injectSyncUI);
+    } else {
+      _injectSyncUI();
+    }
+
+    const local   = _Store.getGastos();
+    const pending = _Store.getQueue().length;
+
+    if (local.length > 0 && !_Store.needsSync()) {
+      // Datos frescos: mostrar al instante, sync en background
+      if (pending > 0) {
+        _setSyncStatus("pending");
+        _scheduleFlush();
+      }
+      // Background sync sin bloquear
+      _flushQueue().then(_syncFromSheets).catch(() => {});
+      return GastosDB.getAll();
+    }
+
+    // Sin datos locales o caducados: esperar sync completa
+    await _flushQueue();
+    await _syncFromSheets();
+    return GastosDB.getAll();
+  },
+
+  /** Fuerza una sincronización inmediata con Sheets. */
+  sync() {
+    return _flushQueue().then(_syncFromSheets);
+  }
+};

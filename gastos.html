@@ -247,6 +247,7 @@
     </div>
   </div>
 
+  <script src="app-storage.js"></script>
   <script>
   const APP_CONFIG = {
     usuarios: ["Juani", "Roman"],
@@ -444,8 +445,7 @@
   document.getElementById("editOverlay").addEventListener("click",e=>{if(e.target===e.currentTarget)closeEditModal()});
   document.getElementById("deleteOverlay").addEventListener("click",e=>{if(e.target===e.currentTarget)closeDeleteModal()});
   </script>
-  <script src="app-storage.js"></script>
-  <script>
+    <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(console.error);
     }

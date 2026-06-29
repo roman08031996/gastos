@@ -360,7 +360,9 @@
     tbody.innerHTML=gastos.map(g=>{
       const cat=APP_CONFIG.categorias[g.categoria]||APP_CONFIG.categorias["Otros"];
       const uColor=userColor(g.quienGasto);
-      const fecha=g.fecha?new Date(g.fecha+"T00:00:00").toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";
+      function parseFecha(raw){if(!raw)return null;const s=String(raw).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return new Date(s+"T00:00:00");const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);if(m)return new Date(`${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}T00:00:00`);return null;}
+      const _fd=parseFecha(g.fecha);
+      const fecha=_fd&&!isNaN(_fd)?_fd.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";
       const detalle=g.tipo||g.subcategoria||"—";
       const desc=g.descripcion?`<br><small style="color:var(--text-dim)">${g.descripcion.substring(0,60)}</small>`:"";
       const safeId=g.id.replace(/'/g,"");

@@ -54,7 +54,8 @@
     .month-picker-wrap{display:flex;align-items:center;gap:8px}
     .month-picker-wrap select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--sans);font-size:13px;padding:7px 12px;cursor:pointer;outline:none}
     .page-content{padding:28px 24px;flex:1}
-    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+    .stats-grid-bottom{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
     .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden}
     .stat-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;color:white;margin-bottom:14px}
     .stat-value{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px}
@@ -92,6 +93,25 @@
     .app-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface2);border:1px solid var(--border);border-radius:40px;padding:12px 24px;font-size:14px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 8px 40px rgba(0,0,0,.4);transition:transform 0.35s cubic-bezier(.4,0,.2,1);white-space:nowrap}
     .app-toast.show{transform:translateX(-50%) translateY(0)}
     @media(max-width:900px){.charts-grid{grid-template-columns:1fr}}
+    .stat-card.ingreso-card{cursor:pointer;transition:border-color .2s,transform .15s}
+    .stat-card.ingreso-card:hover{border-color:var(--accent3);transform:translateY(-2px)}
+    .saldo-positivo{color:#10b981}
+    .saldo-negativo{color:#ef4444}
+    .ingreso-hint{font-size:11px;color:var(--text-dim);margin-top:6px;display:flex;align-items:center;gap:4px}
+    /* Modal ingreso */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+    .modal-overlay.active{display:flex}
+    .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:420px}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+    .modal-title{font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+    .modal-body{padding:24px}
+    .modal-footer{display:flex;gap:10px;justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--border)}
+    .btn-close-modal{background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:4px;border-radius:6px;display:flex}
+    .btn-close-modal:hover{color:var(--text)}
+    .form-label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.6px}
+    .form-control{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--sans);font-size:14px;padding:10px 14px;transition:border-color 0.15s;outline:none}
+    .form-control:focus{border-color:var(--accent3)}
+    .ingreso-big{font-family:var(--mono);font-size:32px;font-weight:700;color:#10b981;text-align:center;padding:12px 0 4px}
     @media(max-width:768px){
       .main-content{margin-left:0}
       .sidebar{transform:translateX(-100%);z-index:220}
@@ -100,59 +120,11 @@
       .menu-btn{display:flex}
       .page-content{padding:20px 16px}
       .stats-grid{grid-template-columns:1fr 1fr}
+      .stats-grid-bottom{grid-template-columns:1fr 1fr}
       .topbar{padding:0 16px}
       .fab{bottom:20px;right:20px}
     }
-    @media(max-width:480px){.stats-grid{grid-template-columns:1fr}}
-
-    /* ── Banner de sincronización ── */
-    .sync-banner{
-      display:flex;align-items:center;gap:12px;
-      background:linear-gradient(135deg,#6C63FF18,#F59E0B10);
-      border:1px solid #6C63FF33;border-radius:var(--radius);
-      padding:13px 16px;margin-bottom:20px;
-      animation:bannerIn 0.4s cubic-bezier(.4,0,.2,1);
-      position:relative;overflow:hidden;
-    }
-    .sync-banner::before{
-      content:'';position:absolute;inset:0;
-      background:linear-gradient(90deg,transparent,rgba(108,99,255,.04),transparent);
-      animation:shimmer 2.5s infinite;
-    }
-    @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
-    @keyframes bannerIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-    .sync-banner-icon{
-      width:36px;height:36px;border-radius:10px;
-      background:linear-gradient(135deg,#6C63FF,#9d5cff);
-      display:flex;align-items:center;justify-content:center;
-      font-size:17px;color:white;flex-shrink:0;
-    }
-    .sync-banner-icon i{animation:spin 2s linear infinite}
-    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-    .sync-banner-icon.done{background:linear-gradient(135deg,#10b981,#059669)}
-    .sync-banner-icon.done i{animation:none}
-    .sync-banner-text{flex:1;min-width:0}
-    .sync-banner-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
-    .sync-banner-sub{font-size:12px;color:var(--text-muted);line-height:1.4}
-    .sync-banner-timer{
-      font-family:var(--mono);font-size:13px;font-weight:600;
-      color:var(--accent);background:#6C63FF18;
-      border-radius:20px;padding:4px 12px;flex-shrink:0;
-      border:1px solid #6C63FF33;
-    }
-    .sync-banner-close{
-      background:none;border:none;color:var(--text-dim);cursor:pointer;
-      font-size:16px;padding:4px;border-radius:6px;transition:color 0.15s;
-      display:flex;flex-shrink:0;
-    }
-    .sync-banner-close:hover{color:var(--text)}
-    .sync-banner.synced{
-      background:linear-gradient(135deg,#10b98118,#10b98108);
-      border-color:#10b98133;
-    }
-    .sync-banner.synced .sync-banner-timer{
-      color:#10b981;background:#10b98118;border-color:#10b98133;
-    }
+    @media(max-width:480px){.stats-grid{grid-template-columns:1fr}.stats-grid-bottom{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -198,26 +170,29 @@
     </header>
 
     <main class="page-content">
-
-      <!-- Banner de sincronización -->
-      <div class="sync-banner" id="syncBanner">
-        <div class="sync-banner-icon" id="syncBannerIcon">
-          <i class="bi bi-arrow-repeat"></i>
-        </div>
-        <div class="sync-banner-text">
-          <p class="sync-banner-title" id="syncBannerTitle">Sincronizando con la base de datos…</p>
-          <p class="sync-banner-sub" id="syncBannerSub">El dashboard puede tardar hasta 3 min en reflejar los últimos cambios mientras se conecta con Google Sheets.</p>
-        </div>
-        <span class="sync-banner-timer" id="syncBannerTimer">0s</span>
-        <button class="sync-banner-close" id="syncBannerClose" title="Cerrar"><i class="bi bi-x-lg"></i></button>
-      </div>
-
+      <!-- Fila superior: Ingresos · Gastos totales · Saldo restante -->
       <div class="stats-grid">
+        <div class="stat-card ingreso-card" id="ingresoCard" onclick="openIngresoModal()" title="Hacer clic para editar ingresos">
+          <div class="stat-icon" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="bi bi-arrow-down-circle-fill"></i></div>
+          <div class="stat-value" id="statIngreso">$0</div>
+          <div class="stat-label">Ingresos del mes</div>
+          <div class="ingreso-hint"><i class="bi bi-pencil" style="font-size:10px"></i> Tocar para editar</div>
+        </div>
         <div class="stat-card">
           <div class="stat-icon" style="background:var(--accent)"><i class="bi bi-currency-dollar"></i></div>
           <div class="stat-value" id="statTotal">$0</div>
-          <div class="stat-label">Total del mes</div>
+          <div class="stat-label">Gastos del mes</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-icon" id="saldoIcon" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="bi bi-wallet-fill"></i></div>
+          <div class="stat-value" id="statSaldo">$0</div>
+          <div class="stat-label">Saldo disponible</div>
+          <div class="stat-sub" id="statSaldoPct"></div>
+        </div>
+      </div>
+
+      <!-- Fila inferior: por usuario + cantidad -->
+      <div class="stats-grid-bottom">
         <div class="stat-card">
           <div class="stat-icon" id="statU1Icon"><i class="bi bi-person-fill"></i></div>
           <div class="stat-value" id="statU1">$0</div>
@@ -273,6 +248,36 @@
   </div>
 
   <a href="nuevo.html" class="fab" title="Nuevo gasto"><i class="bi bi-plus-lg"></i></a>
+
+  <!-- Modal: Ingreso mensual -->
+  <div class="modal-overlay" id="ingresoModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title"><i class="bi bi-arrow-down-circle-fill" style="color:#10b981"></i> Ingreso del mes</div>
+        <button class="btn-close-modal" onclick="closeIngresoModal()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
+          Ingresá el total de ingresos de este mes. El saldo disponible se calcula restando todos los gastos del mes.
+        </p>
+        <div style="margin-bottom:16px">
+          <label class="form-label">Mes</label>
+          <p id="ingresoMesLabel" style="font-size:14px;font-weight:600;color:var(--text);text-transform:capitalize"></p>
+        </div>
+        <div>
+          <label class="form-label">Monto total (ARS)</label>
+          <input type="number" class="form-control" id="ingresoInput" placeholder="Ej: 500000" min="0" step="1"
+            style="font-family:var(--mono);font-size:18px;font-weight:700" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeIngresoModal()">Cancelar</button>
+        <button class="btn btn-primary" style="background:#10b981;border-color:#10b981" onclick="saveIngreso()">
+          <i class="bi bi-check-lg"></i> Guardar ingreso
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="app-storage.js"></script>
@@ -361,6 +366,40 @@
     const navAdmin=document.getElementById("navAdmin");
     if(navAdmin&&currentUser==="Roman") navAdmin.style.display="flex";
   }
+
+  // ===== INGRESOS =====
+  const LS_INGRESOS = "gastosapp_ingresos"; // { "2026-06": 500000, ... }
+
+  function ingresoKey(y, m) { return `${y}-${String(m).padStart(2,"0")}`; }
+  function getIngreso(y, m) {
+    try { const d=JSON.parse(localStorage.getItem(LS_INGRESOS)||"{}"); return d[ingresoKey(y,m)]||0; } catch { return 0; }
+  }
+  function setIngreso(y, m, val) {
+    try {
+      const d=JSON.parse(localStorage.getItem(LS_INGRESOS)||"{}");
+      d[ingresoKey(y,m)]=val;
+      localStorage.setItem(LS_INGRESOS, JSON.stringify(d));
+    } catch {}
+  }
+
+  function openIngresoModal() {
+    const mes = new Intl.DateTimeFormat("es-AR",{month:"long",year:"numeric"}).format(new Date(selectedYear,selectedMonth-1,1));
+    document.getElementById("ingresoMesLabel").textContent = mes.charAt(0).toUpperCase()+mes.slice(1);
+    const current = getIngreso(selectedYear, selectedMonth);
+    document.getElementById("ingresoInput").value = current || "";
+    document.getElementById("ingresoModal").classList.add("active");
+    setTimeout(()=>document.getElementById("ingresoInput").focus(), 100);
+  }
+  function closeIngresoModal() { document.getElementById("ingresoModal").classList.remove("active"); }
+  function saveIngreso() {
+    const val = parseFloat(document.getElementById("ingresoInput").value) || 0;
+    setIngreso(selectedYear, selectedMonth, val);
+    closeIngresoModal();
+    renderDashboard();
+    showToast("Ingreso guardado correctamente", "success");
+  }
+  // Cerrar con Escape
+  document.addEventListener("keydown", e => { if(e.key==="Escape") closeIngresoModal(); });
   function buildMonthPicker() {
     const picker=document.getElementById("monthPicker"); if(!picker) return;
     picker.innerHTML="";
@@ -391,16 +430,46 @@
     const prefix=`${selectedYear}-${String(selectedMonth).padStart(2,"0")}`;
     const gastos=allGastos.filter(g=>g.fecha&&g.fecha.startsWith(prefix));
     const total=gastos.reduce((s,g)=>s+(g.monto||0),0);
+    const ingreso=getIngreso(selectedYear,selectedMonth);
+    const saldo=ingreso-total;
+
     const perUser={};
     APP_CONFIG.usuarios.forEach(u=>{perUser[u]=0});
     gastos.forEach(g=>{if(g.quienGasto) perUser[g.quienGasto]=(perUser[g.quienGasto]||0)+g.monto});
     const [u1,u2]=APP_CONFIG.usuarios;
     const m1=perUser[u1]||0, m2=perUser[u2]||0;
+
+    // Ingresos
+    setText("statIngreso", formatMoney(ingreso));
+
+    // Gastos
     setText("statTotal",formatMoney(total));
+
+    // Saldo
+    const saldoEl=document.getElementById("statSaldo");
+    const saldoIcon=document.getElementById("saldoIcon");
+    if(saldoEl){
+      saldoEl.textContent=formatMoney(Math.abs(saldo));
+      saldoEl.className="stat-value "+(saldo>=0?"saldo-positivo":"saldo-negativo");
+    }
+    if(saldoIcon){
+      saldoIcon.style.background=saldo>=0
+        ?"linear-gradient(135deg,#10b981,#059669)"
+        :"linear-gradient(135deg,#ef4444,#dc2626)";
+    }
+    if(ingreso>0){
+      const pct=Math.min(100,(total/ingreso)*100);
+      setText("statSaldoPct", saldo>=0
+        ? `Gastaste el ${pct.toFixed(0)}% del ingreso`
+        : `Excediste el ingreso en ${formatMoney(Math.abs(saldo))}`);
+    } else {
+      setText("statSaldoPct","Sin ingreso registrado");
+    }
+
     setText("statU1Label",u1); setText("statU2Label",u2);
     setText("statU1",formatMoney(m1)); setText("statU2",formatMoney(m2));
-    setText("statU1Pct",total?`${((m1/total)*100).toFixed(0)}%`:"0%");
-    setText("statU2Pct",total?`${((m2/total)*100).toFixed(0)}%`:"0%");
+    setText("statU1Pct",total?`${((m1/total)*100).toFixed(0)}% del gasto`:"0%");
+    setText("statU2Pct",total?`${((m2/total)*100).toFixed(0)}% del gasto`:"0%");
     setText("statCount",gastos.length);
     setStyle("statU1Icon","background",`linear-gradient(135deg,${APP_CONFIG.coloresUsuarios[u1]},${APP_CONFIG.coloresUsuarios[u1]}88)`);
     setStyle("statU2Icon","background",`linear-gradient(135deg,${APP_CONFIG.coloresUsuarios[u2]},${APP_CONFIG.coloresUsuarios[u2]}88)`);
@@ -471,70 +540,9 @@
       </div>`;
     }).join("");
   }
-  // ===== BANNER DE SINCRONIZACIÓN =====
-  (function initSyncBanner() {
-    const banner    = document.getElementById("syncBanner");
-    const icon      = document.getElementById("syncBannerIcon");
-    const iconI     = icon?.querySelector("i");
-    const title     = document.getElementById("syncBannerTitle");
-    const sub       = document.getElementById("syncBannerSub");
-    const timerEl   = document.getElementById("syncBannerTimer");
-    const closeBtn  = document.getElementById("syncBannerClose");
-    if (!banner) return;
-
-    let seconds = 0;
-    let synced  = false;
-
-    // Contador de segundos visible
-    const interval = setInterval(() => {
-      seconds++;
-      if (!synced && timerEl) timerEl.textContent = seconds + "s";
-    }, 1000);
-
-    // Cerrar manualmente
-    closeBtn?.addEventListener("click", () => {
-      clearInterval(interval);
-      banner.style.transition = "opacity 0.3s, transform 0.3s";
-      banner.style.opacity = "0";
-      banner.style.transform = "translateY(-8px)";
-      setTimeout(() => banner.remove(), 350);
-    });
-
-    // Cuando Sheets responde → marcar como sincronizado
-    function markSynced() {
-      if (synced) return;
-      synced = true;
-      clearInterval(interval);
-      const elapsed = seconds;
-
-      banner.classList.add("synced");
-      if (iconI)  { iconI.className = "bi bi-check-lg"; }
-      if (icon)   icon.classList.add("done");
-      if (title)  title.textContent = "¡Datos actualizados!";
-      if (sub)    sub.textContent   = `La sincronización con Google Sheets tardó ${elapsed} segundo${elapsed !== 1 ? "s" : ""}.`;
-      if (timerEl) timerEl.textContent = elapsed + "s ✓";
-
-      // Auto-cerrar tras 4s
-      setTimeout(() => {
-        if (!banner.parentNode) return;
-        banner.style.transition = "opacity 0.4s, transform 0.4s";
-        banner.style.opacity = "0";
-        banner.style.transform = "translateY(-8px)";
-        setTimeout(() => banner.remove(), 450);
-      }, 4000);
-    }
-
-    // Escuchar el evento que dispara app-storage.js cuando sync termina
-    window.addEventListener("gastosUpdated", markSynced);
-
-    // Si los datos ya estaban frescos en caché, marcar rápido igual
-    const lastSync = parseInt(localStorage.getItem("gastosapp_last_sync") || "0");
-    const age = Date.now() - lastSync;
-    if (age < 60 * 1000) {
-      setTimeout(markSynced, 800);
-    }
-  })();
   </script>
+    <script>
+    if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(console.error);
     }
   </script>

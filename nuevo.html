@@ -74,6 +74,15 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .app-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface2);border:1px solid var(--border);border-radius:40px;padding:12px 24px;font-size:14px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 8px 40px rgba(0,0,0,.4);transition:transform 0.35s cubic-bezier(.4,0,.2,1);white-space:nowrap}
     .app-toast.show{transform:translateX(-50%) translateY(0)}
+
+    /* ── Preset COMEDOR ── */
+    .preset-bar{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:18px;cursor:pointer;transition:border-color .15s;user-select:none}
+    .preset-bar:hover{border-color:var(--accent)}
+    .preset-bar input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+    .preset-bar-icon{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:16px;color:white;flex-shrink:0}
+    .preset-bar-text{flex:1}
+    .preset-bar-title{font-size:14px;font-weight:700;color:var(--text)}
+    .preset-bar-sub{font-size:12px;color:var(--text-muted);margin-top:1px}
     @media(max-width:768px){
       .main-content{margin-left:0}
       .sidebar{transform:translateX(-100%);z-index:220}
@@ -101,11 +110,12 @@
       <a href="nuevo.html"     class="nav-item active"><i class="bi bi-plus-circle-fill"></i> Nuevo gasto</a>
       <a href="gastos.html"    class="nav-item"><i class="bi bi-list-ul"></i> Todos los gastos</a>
       <a href="historial.html" class="nav-item"><i class="bi bi-clock-history"></i> Historial</a>
+      <a href="admin.html" class="nav-item" id="navAdmin" style="display:none"><i class="bi bi-shield-lock-fill"></i> Administración</a>
     </nav>
     <div class="sidebar-footer">
       <div class="sidebar-user">
         <div class="su-avatar" id="suAvatar">U</div>
-        <div class="su-info"><p class="su-name" id="suName">Usuario</p><p class="su-role">Miembro</p></div>
+        <div class="su-info"><p class="su-name" id="suName">Usuario</p><p class="su-role" id="suRole">Miembro</p></div>
         <button class="btn-logout" onclick="logout()" title="Cerrar sesión"><i class="bi bi-box-arrow-right"></i></button>
       </div>
     </div>
@@ -129,6 +139,17 @@
           </div>
           <p class="preview-cat" id="previewCat">—</p>
         </div>
+
+        <!-- Preset COMEDOR -->
+        <label class="preset-bar" id="presetComedor">
+          <input type="checkbox" id="chkComedor" />
+          <div class="preset-bar-icon"><i class="bi bi-cup-hot-fill"></i></div>
+          <div class="preset-bar-text">
+            <p class="preset-bar-title">COMEDOR</p>
+            <p class="preset-bar-sub">Autocompleta: $2.800 · Alimentación · Restaurante</p>
+          </div>
+          <span style="font-size:12px;color:var(--text-dim);font-family:var(--mono)">$2.800</span>
+        </label>
 
         <div class="card">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="grid-2">
@@ -185,9 +206,12 @@
   <script src="app-storage.js"></script>
   <script>
   // ===== CONFIG =====
+  // ── Usuarios dinámicos desde localStorage ──
+  function loadUsers(){try{const r=localStorage.getItem("gastosapp_users");if(r)return JSON.parse(r);}catch{}return{"Juani":{pin:"1234",color:"#6C63FF"},"Roman":{pin:"1234",color:"#F59E0B"}};}
+  const _USERS = loadUsers();
   const APP_CONFIG = {
-    usuarios: ["Juani", "Roman"],
-    coloresUsuarios: { "Juani": "#6C63FF", "Roman": "#F59E0B" },
+    usuarios: Object.keys(_USERS),
+    coloresUsuarios: Object.fromEntries(Object.entries(_USERS).map(([k,v])=>[k,v.color])),
     categorias: {
       "Vivienda":     { icon:"bi-house-fill",       color:"#6C63FF", subcategorias:["Alquiler","Expensas","Servicios","Internet","Limpieza","Mantenimiento"] },
       "Alimentación": { icon:"bi-cart-fill",         color:"#10b981", subcategorias:["Supermercado","Verdulería","Carnicería","Almacén","Delivery","Restaurante"] },
@@ -240,7 +264,56 @@
     const avatar=document.getElementById("suAvatar"),name=document.getElementById("suName");
     if(avatar){avatar.style.background=`linear-gradient(135deg,${color},${color}88)`;avatar.textContent=currentUser.charAt(0).toUpperCase()}
     if(name) name.textContent=currentUser;
+    const role=document.getElementById("suRole");
+    if(role) role.textContent=currentUser==="Roman"?"Administrador":"Miembro";
+    const navAdmin=document.getElementById("navAdmin");
+    if(navAdmin&&currentUser==="Roman") navAdmin.style.display="flex";
   }
+
+  // ── Preset COMEDOR ──────────────────────────────────────────
+  const COMEDOR_PRESET = { monto: 2800, categoria: "Alimentación", subcategoria: "Restaurante", tipo: "Comedor" };
+
+  function applyComedor(checked) {
+    const fieldsWrap = document.querySelector(".card");
+    if (checked) {
+      // Aplicar valores
+      const montoEl = document.getElementById("monto");
+      const catEl   = document.getElementById("categoria");
+      if (montoEl) montoEl.value = COMEDOR_PRESET.monto;
+      if (catEl) {
+        catEl.value = COMEDOR_PRESET.categoria;
+        catEl.dispatchEvent(new Event("change")); // actualiza subcategorias
+        // Esperar a que se regenere el select de subcats
+        setTimeout(() => {
+          const subEl = document.getElementById("subcategoria");
+          if (subEl) subEl.value = COMEDOR_PRESET.subcategoria;
+          const tipoEl = document.getElementById("tipo");
+          if (tipoEl) tipoEl.value = COMEDOR_PRESET.tipo;
+          updatePreview();
+        }, 20);
+      }
+      // Deshabilitar campos autocompletos visualmente
+      ["monto","categoria","subcategoria","tipo"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.readOnly = true; el.style.opacity = ".6"; el.style.pointerEvents = "none"; }
+      });
+      document.getElementById("presetComedor").style.borderColor = "var(--accent3)";
+      document.getElementById("presetComedor").style.background  = "#10b98110";
+    } else {
+      // Restaurar
+      ["monto","categoria","subcategoria","tipo"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.readOnly = false; el.style.opacity = ""; el.style.pointerEvents = ""; }
+      });
+      document.getElementById("monto").value = "";
+      document.getElementById("tipo").value  = "";
+      document.getElementById("presetComedor").style.borderColor = "";
+      document.getElementById("presetComedor").style.background  = "";
+      updatePreview();
+    }
+  }
+
+  document.getElementById("chkComedor")?.addEventListener("change", e => applyComedor(e.target.checked));
 
   function buildSelects(){
     const selUsr=document.getElementById("quienGasto");

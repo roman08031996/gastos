@@ -128,11 +128,12 @@
       <a href="nuevo.html"     class="nav-item"><i class="bi bi-plus-circle-fill"></i> Nuevo gasto</a>
       <a href="gastos.html"    class="nav-item active"><i class="bi bi-list-ul"></i> Todos los gastos</a>
       <a href="historial.html" class="nav-item"><i class="bi bi-clock-history"></i> Historial</a>
+      <a href="admin.html" class="nav-item" id="navAdmin" style="display:none"><i class="bi bi-shield-lock-fill"></i> Administración</a>
     </nav>
     <div class="sidebar-footer">
       <div class="sidebar-user">
         <div class="su-avatar" id="suAvatar">U</div>
-        <div class="su-info"><p class="su-name" id="suName">Usuario</p><p class="su-role">Miembro</p></div>
+        <div class="su-info"><p class="su-name" id="suName">Usuario</p><p class="su-role" id="suRole">Miembro</p></div>
         <button class="btn-logout" onclick="logout()" title="Cerrar sesión"><i class="bi bi-box-arrow-right"></i></button>
       </div>
     </div>
@@ -249,9 +250,12 @@
 
   <script src="app-storage.js"></script>
   <script>
+  // ── Usuarios dinámicos desde localStorage ──
+  function loadUsers(){try{const r=localStorage.getItem("gastosapp_users");if(r)return JSON.parse(r);}catch{}return{"Juani":{pin:"1234",color:"#6C63FF"},"Roman":{pin:"1234",color:"#F59E0B"}};}
+  const _USERS = loadUsers();
   const APP_CONFIG = {
-    usuarios: ["Juani", "Roman"],
-    coloresUsuarios: { "Juani": "#6C63FF", "Roman": "#F59E0B" },
+    usuarios: Object.keys(_USERS),
+    coloresUsuarios: Object.fromEntries(Object.entries(_USERS).map(([k,v])=>[k,v.color])),
     categorias: {
       "Vivienda":     { icon:"bi-house-fill",       color:"#6C63FF", subcategorias:["Alquiler","Expensas","Servicios","Internet","Limpieza","Mantenimiento"] },
       "Alimentación": { icon:"bi-cart-fill",         color:"#10b981", subcategorias:["Supermercado","Verdulería","Carnicería","Almacén","Delivery","Restaurante"] },
@@ -311,6 +315,10 @@
     const avatar=document.getElementById("suAvatar"),name=document.getElementById("suName");
     if(avatar){avatar.style.background=`linear-gradient(135deg,${color},${color}88)`;avatar.textContent=user.charAt(0).toUpperCase()}
     if(name) name.textContent=user;
+    const role=document.getElementById("suRole");
+    if(role) role.textContent=user==="Roman"?"Administrador":"Miembro";
+    const navAdmin=document.getElementById("navAdmin");
+    if(navAdmin&&user==="Roman") navAdmin.style.display="flex";
   }
 
   function buildFilters(){

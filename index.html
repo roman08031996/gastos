@@ -117,13 +117,23 @@
 
   <script>
     // ===== CONFIG =====
-    const APP_CONFIG = {
-      usuarios: ["Juani", "Roman"],
-      coloresUsuarios: { "Juani": "#6C63FF", "Roman": "#F59E0B" }
-    };
-    const USERS = {
+    // ── Leer usuarios desde localStorage (admin.html los gestiona) ──
+    const DEFAULT_USERS = {
       "Juani": { pin: "1234", color: "#6C63FF" },
       "Roman": { pin: "1234", color: "#F59E0B" }
+    };
+    function loadUsers() {
+      try {
+        const raw = localStorage.getItem("gastosapp_users");
+        if (raw) return JSON.parse(raw);
+      } catch {}
+      localStorage.setItem("gastosapp_users", JSON.stringify(DEFAULT_USERS));
+      return { ...DEFAULT_USERS };
+    }
+    const USERS = loadUsers();
+    const APP_CONFIG = {
+      usuarios: Object.keys(USERS),
+      coloresUsuarios: Object.fromEntries(Object.entries(USERS).map(([k,v]) => [k, v.color]))
     };
 
     // Redirigir si ya hay sesión

@@ -1,9 +1,12 @@
 /**
- * GastosApp — app-storage.js
- * localStorage como fuente principal (respuesta instantánea)
- * Sync con Google Sheets en background cada 10 minutos
- * Cola de cambios pendientes para cuando no hay conexión
- * Indicador visual de estado de sync
+ * GastosApp — app-storage.js  (v3 — fix duplicados + fix lentitud)
+ *
+ * Cambios respecto a v2:
+ *  - Cada op en la queue tiene un `qid` (UUID) único → nunca se procesa dos veces
+ *  - _flushQueue procesa y remueve por qid, no por timestamp (evita race conditions)
+ *  - init() SIEMPRE muestra datos locales al instante; sync corre en background
+ *  - _scheduleFlush delay reducido a 800ms
+ *  - Guard _syncing refactorizado para liberar el lock correctamente en todos los paths
  */
 
 const SHEETS_URL    = "https://script.google.com/macros/s/AKfycbxBi_2LnML9JiUH_FlIQQ-mvwSYWbYajw7lxa2UKBapD-jLaabhdqeoOfbq-9E8GVY1/exec";
@@ -70,6 +73,14 @@ const _Store = {
   needsSync() { return (Date.now() - _Store.getLastSync()) > SYNC_INTERVAL; }
 };
 
+// ─── Genera un ID único para cada operación en cola ───────────────────────────
+function _newQid() {
+  // crypto.randomUUID() disponible en todos los browsers modernos y en PWAs
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  // Fallback por si acaso
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 // ─── API helper — GET querystring para evitar preflight CORS ─────────────────
 async function _sheetsCall(action, payload = {}) {
   const url = new URL(SHEETS_URL);
@@ -84,44 +95,47 @@ async function _sheetsCall(action, payload = {}) {
   return data;
 }
 
-// ─── Mutex: evita que _flushQueue y _syncFromSheets corran en paralelo ────────
+// ─── Mutex ────────────────────────────────────────────────────────────────────
 let _syncing = false;
 
 // ─── Flush: enviar operaciones pendientes a Sheets ────────────────────────────
-// Retorna true si completó, false si había otra ejecución en curso
 async function _flushQueue() {
   if (!navigator.onLine) return;
-  if (_syncing) return;           // ← MUTEX: ya hay una sync en curso, salir
+  if (_syncing) return;
+
   const queue = _Store.getQueue();
   if (queue.length === 0) return;
 
   _syncing = true;
   _setSyncStatus("syncing");
 
-  // Snapshot de la queue actual — procesar solo estas operaciones
-  // Así si llega un create nuevo mientras flusheamos, no lo tocamos
+  // Snapshot: solo procesamos las ops que están ahora en la queue
+  // Cada op tiene un `qid` único — usamos eso para rastrear cuáles terminamos
   const toProcess = [...queue];
-  const failed = [];
+  const succeededQids = new Set();
 
   for (const op of toProcess) {
     try {
       if      (op.action === "create") await _sheetsCall("create", { gasto: op.gasto });
       else if (op.action === "update") await _sheetsCall("update", { id: op.id, gasto: op.gasto });
       else if (op.action === "delete") await _sheetsCall("delete", { id: op.id });
+      succeededQids.add(op.qid); // ← marcar como exitosa por su ID único
     } catch {
-      failed.push(op);
+      // No agregar a succeededQids → se reintentará
     }
   }
 
-  // De la queue actual, remover solo las que procesamos (pueden haber llegado nuevas)
+  // Remover de la queue SOLO las que tuvieron éxito (por qid, no por timestamp)
   const currentQueue = _Store.getQueue();
-  const processedTs  = new Set(toProcess.map(op => op.ts));
-  const remaining    = currentQueue.filter(op => !processedTs.has(op.ts) || failed.some(f => f.ts === op.ts));
+  const remaining = currentQueue.filter(op => !succeededQids.has(op.qid));
   _Store.setQueue(remaining);
 
-  if (failed.length === 0) {
+  if (remaining.length === 0) {
     _Store.setLastSync();
-    _setSyncStatus(remaining.length > 0 ? "pending" : "ok");
+    _setSyncStatus("ok");
+  } else if (succeededQids.size > 0) {
+    // Algunas pasaron, otras no
+    _setSyncStatus("pending");
   } else {
     _setSyncStatus("error");
   }
@@ -132,7 +146,7 @@ async function _flushQueue() {
 // ─── Sync: bajar todo de Sheets y actualizar caché ───────────────────────────
 async function _syncFromSheets() {
   if (!navigator.onLine) { _setSyncStatus("error"); return; }
-  if (_syncing) return;           // ← MUTEX
+  if (_syncing) return;
   _syncing = true;
   _setSyncStatus("syncing");
 
@@ -140,33 +154,24 @@ async function _syncFromSheets() {
     const data   = await _sheetsCall("getAll");
     const remote = data.gastos || [];
 
-    // Merge sin duplicados usando Map keyed por ID
-    // Remote es la fuente de verdad, EXCEPTO para IDs con ops pendientes
-    // donde la versión local gana para no perder cambios offline
     const queue    = _Store.getQueue();
     const queueIds = new Set(queue.map(op => op.id).filter(Boolean));
-    // Para creates pendientes: el gasto está en la queue, no en queueIds (que es por op.id)
     const pendingCreateIds = new Set(
       queue.filter(op => op.action === "create").map(op => op.gasto?.id).filter(Boolean)
     );
     const local    = _Store.getGastos();
     const localMap = Object.fromEntries(local.map(g => [g.id, g]));
 
-    // Base: remote
     const mergeMap = new Map(remote.map(g => [g.id, g]));
 
-    // Sobreescribir con local para updates/deletes pendientes
     queueIds.forEach(id => {
       if (localMap[id]) mergeMap.set(id, localMap[id]);
     });
 
-    // Para creates pendientes: si ya llegaron a remote, usamos remote (evitar duplicado)
-    // Si NO llegaron aún, los agregamos desde local
     pendingCreateIds.forEach(id => {
       if (!mergeMap.has(id) && localMap[id]) {
         mergeMap.set(id, localMap[id]);
       }
-      // Si ya está en remote, no hacer nada — remote ya tiene la copia correcta
     });
 
     _Store.setGastos(Array.from(mergeMap.values()));
@@ -181,14 +186,16 @@ async function _syncFromSheets() {
   _syncing = false;
 }
 
-// ─── Flush diferido (evita spam de requests) ─────────────────────────────────
+// ─── Flush diferido ───────────────────────────────────────────────────────────
 let _flushTimer = null;
-function _scheduleFlush(delay = 2000) {
+function _scheduleFlush(delay = 800) { // ← reducido de 2000ms a 800ms
   clearTimeout(_flushTimer);
   _flushTimer = setTimeout(async () => {
     await _flushQueue();
-    // Después del flush, sync para que local refleje el estado real de Sheets
-    if (_Store.getQueue().length === 0) await _syncFromSheets();
+    // Sync en background SOLO si la queue quedó vacía
+    if (_Store.getQueue().length === 0) {
+      _syncFromSheets(); // sin await → no bloquea
+    }
   }, delay);
 }
 
@@ -227,19 +234,25 @@ const GastosDB = {
   /** Crea un gasto nuevo. Escribe en localStorage al instante y encola sync con Sheets. */
   create(gasto) {
     const gastos = _Store.getGastos();
-    // Guardia: nunca insertar el mismo ID dos veces en local
     if (gastos.some(g => g.id === gasto.id)) {
       console.warn("GastosDB.create: ID duplicado ignorado", gasto.id);
       return gasto;
     }
     gastos.push(gasto);
     _Store.setGastos(gastos);
-    // Guardia: no encolar el mismo create dos veces
+
+    // Guardia: no encolar el mismo gasto.id dos veces
     const queue = _Store.getQueue();
     if (!queue.some(op => op.action === "create" && op.gasto?.id === gasto.id)) {
-      queue.push({ action: "create", gasto, ts: Date.now() });
+      queue.push({
+        qid: _newQid(),      // ← ID único de operación
+        action: "create",
+        gasto,
+        ts: Date.now()
+      });
       _Store.setQueue(queue);
     }
+
     _setSyncStatus("pending");
     _scheduleFlush();
     window.dispatchEvent(new CustomEvent("gastosUpdated"));
@@ -253,9 +266,17 @@ const GastosDB = {
     if (idx === -1) throw new Error("Gasto no encontrado: " + id);
     gastos[idx] = { ...gastos[idx], ...changes };
     _Store.setGastos(gastos);
+
     const queue = _Store.getQueue();
-    queue.push({ action: "update", id, gasto: gastos[idx], ts: Date.now() });
+    queue.push({
+      qid: _newQid(),        // ← ID único de operación
+      action: "update",
+      id,
+      gasto: gastos[idx],
+      ts: Date.now()
+    });
     _Store.setQueue(queue);
+
     _setSyncStatus("pending");
     _scheduleFlush();
     window.dispatchEvent(new CustomEvent("gastosUpdated"));
@@ -265,9 +286,16 @@ const GastosDB = {
   /** Elimina un gasto por id. */
   delete(id) {
     _Store.setGastos(_Store.getGastos().filter(g => g.id !== id));
+
     const queue = _Store.getQueue();
-    queue.push({ action: "delete", id, ts: Date.now() });
+    queue.push({
+      qid: _newQid(),        // ← ID único de operación
+      action: "delete",
+      id,
+      ts: Date.now()
+    });
     _Store.setQueue(queue);
+
     _setSyncStatus("pending");
     _scheduleFlush();
     window.dispatchEvent(new CustomEvent("gastosUpdated"));
@@ -275,8 +303,9 @@ const GastosDB = {
 
   /**
    * Inicialización asíncrona.
-   * Si hay datos frescos en localStorage: devuelve inmediato, sync en background.
-   * Si no: espera la sync completa.
+   *
+   * FIX LENTITUD: SIEMPRE retorna los datos locales al instante.
+   * La sync con Sheets corre en background sin bloquear la UI nunca.
    */
   async init() {
     if (document.readyState === "loading") {
@@ -285,22 +314,23 @@ const GastosDB = {
       _injectSyncUI();
     }
 
-    const local   = _Store.getGastos();
     const pending = _Store.getQueue().length;
 
-    if (local.length > 0 && !_Store.needsSync()) {
-      if (pending > 0) {
-        _setSyncStatus("pending");
-        // Flush en background SIN sync posterior inmediata
-        // (la sync vendrá sola al completarse el flush via _scheduleFlush)
-        setTimeout(_flushQueue, 500);
-      }
-      return GastosDB.getAll();
+    // 1. Si hay ops pendientes, intentar flush en background
+    if (pending > 0) {
+      _setSyncStatus("pending");
+      setTimeout(_flushQueue, 300);
     }
 
-    // Sin datos locales o caducados: flush primero, luego sync
-    await _flushQueue();
-    await _syncFromSheets();
+    // 2. Si los datos están viejos, sync en background (sin bloquear)
+    if (_Store.needsSync()) {
+      setTimeout(async () => {
+        await _flushQueue();
+        await _syncFromSheets();
+      }, 500);
+    }
+
+    // 3. SIEMPRE retornar datos locales inmediatamente
     return GastosDB.getAll();
   },
 

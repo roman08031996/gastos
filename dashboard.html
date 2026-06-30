@@ -435,44 +435,30 @@
     renderDashboard();
   }
 
-  // ===== INGRESOS (acumulativo, separado por vista) =====
-  // Estructura: { "familiar": { "2026-06": [{id,nombre,monto}] }, "personal": { "Roman": { "2026-06": [...] } } }
-  const LS_INGRESOS = "gastosapp_ingresos_v2";
+  // ===== INGRESOS (guardados en la misma base que los gastos) =====
+  // Un ingreso es un registro más en GastosDB con tipo:"INGRESO".
+  // El "ámbito" (familiar o personal de quién) viaja en categoria:
+  //   - Familiar  → categoria: "Familiar"
+  //   - Personal  → categoria: "Personal:<NombreUsuario>"
+  // Así usan el mismo create/update/delete/sync/queue/offline que ya existe,
+  // sin tocar app-storage.js ni el Apps Script.
+
+  const TIPO_INGRESO = "INGRESO";
+
+  function scopeIngreso() {
+    return currentView === "personal" ? `Personal:${currentUser}` : "Familiar";
+  }
 
   function ingresoKey(y, m) { return `${y}-${String(m).padStart(2,"0")}`; }
 
-  function loadIngresosRaw() {
-    try { return JSON.parse(localStorage.getItem(LS_INGRESOS) || "{}"); } catch { return {}; }
-  }
-  function saveIngresosRaw(data) { localStorage.setItem(LS_INGRESOS, JSON.stringify(data)); }
-
-  // Migración: si existía el formato viejo (monto único familiar), lo convierte a un ingreso "Ingreso mensual"
-  (function migrarIngresosViejos() {
-    try {
-      const viejo = JSON.parse(localStorage.getItem("gastosapp_ingresos") || "null");
-      if (!viejo) return;
-      const data = loadIngresosRaw();
-      data.familiar = data.familiar || {};
-      Object.entries(viejo).forEach(([key, monto]) => {
-        if (monto > 0 && !data.familiar[key]) {
-          data.familiar[key] = [{ id: "mig_"+key, nombre: "Ingreso mensual", monto }];
-        }
-      });
-      saveIngresosRaw(data);
-      localStorage.removeItem("gastosapp_ingresos");
-    } catch {}
-  })();
-
   function getIngresosList(y, m) {
-    const data = loadIngresosRaw();
-    const key = ingresoKey(y, m);
-    if (currentView === "personal") {
-      data.personal = data.personal || {};
-      data.personal[currentUser] = data.personal[currentUser] || {};
-      return data.personal[currentUser][key] || [];
-    }
-    data.familiar = data.familiar || {};
-    return data.familiar[key] || [];
+    const prefix = ingresoKey(y, m);
+    const scope = scopeIngreso();
+    return allGastos.filter(g =>
+      g.tipo === TIPO_INGRESO &&
+      g.categoria === scope &&
+      g.fecha && g.fecha.startsWith(prefix)
+    );
   }
 
   function getIngresoTotal(y, m) {
@@ -480,33 +466,23 @@
   }
 
   function addIngresoEntry(nombre, monto) {
-    const data = loadIngresosRaw();
-    const key = ingresoKey(selectedYear, selectedMonth);
-    const entry = { id: "ing_"+Date.now()+"_"+Math.random().toString(36).slice(2,7), nombre, monto };
-    if (currentView === "personal") {
-      data.personal = data.personal || {};
-      data.personal[currentUser] = data.personal[currentUser] || {};
-      data.personal[currentUser][key] = data.personal[currentUser][key] || [];
-      data.personal[currentUser][key].push(entry);
-    } else {
-      data.familiar = data.familiar || {};
-      data.familiar[key] = data.familiar[key] || [];
-      data.familiar[key].push(entry);
-    }
-    saveIngresosRaw(data);
+    const fecha = `${selectedYear}-${String(selectedMonth).padStart(2,"0")}-01`;
+    const nuevoIngreso = {
+      id: "ing_" + Date.now() + "_" + Math.random().toString(36).slice(2,7),
+      tipo: TIPO_INGRESO,
+      categoria: scopeIngreso(),
+      subcategoria: "",
+      quienGasto: currentUser,
+      monto: monto,
+      fecha: fecha,
+      descripcion: nombre,
+      creadoEn: new Date().toISOString()
+    };
+    GastosDB.create(nuevoIngreso); // mismo flujo offline-first que los gastos
   }
 
   function deleteIngresoEntry(id) {
-    const data = loadIngresosRaw();
-    const key = ingresoKey(selectedYear, selectedMonth);
-    if (currentView === "personal") {
-      const arr = data.personal?.[currentUser]?.[key];
-      if (arr) data.personal[currentUser][key] = arr.filter(i => i.id !== id);
-    } else {
-      const arr = data.familiar?.[key];
-      if (arr) data.familiar[key] = arr.filter(i => i.id !== id);
-    }
-    saveIngresosRaw(data);
+    GastosDB.delete(id);
   }
 
   function renderIngresoList() {
@@ -520,7 +496,7 @@
         <div class="ingreso-item">
           <div class="ingreso-item-icon"><i class="bi bi-cash"></i></div>
           <div class="ingreso-item-info">
-            <p class="ingreso-item-name">${i.nombre}</p>
+            <p class="ingreso-item-name">${i.descripcion || "Ingreso"}</p>
           </div>
           <span class="ingreso-item-amount">${formatMoney(i.monto)}</span>
           <button class="ingreso-item-del" onclick="removeIngresoAndRefresh('${i.id}')"><i class="bi bi-trash3"></i></button>
@@ -532,6 +508,7 @@
 
   function removeIngresoAndRefresh(id) {
     deleteIngresoEntry(id);
+    allGastos = GastosDB.getAll();
     renderIngresoList();
     renderDashboard();
   }
@@ -544,6 +521,7 @@
     if (!nombre) { showToast("Ingresá un nombre para el ingreso", "error"); return; }
     if (!monto || monto <= 0) { showToast("Ingresá un monto válido", "error"); return; }
     addIngresoEntry(nombre, monto);
+    allGastos = GastosDB.getAll();
     nombreEl.value = ""; montoEl.value = "";
     renderIngresoList();
     renderDashboard();
@@ -591,7 +569,7 @@
 
   function renderDashboard() {
     const prefix=`${selectedYear}-${String(selectedMonth).padStart(2,"0")}`;
-    let gastos=allGastos.filter(g=>g.fecha&&g.fecha.startsWith(prefix));
+    let gastos=allGastos.filter(g=>g.fecha&&g.fecha.startsWith(prefix)&&g.tipo!==TIPO_INGRESO);
 
     // Vista personal: solo los gastos del usuario logueado
     if (currentView === "personal") {

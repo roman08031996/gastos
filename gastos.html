@@ -343,6 +343,7 @@
     const desde=document.getElementById("fDesde")?.value||"";
     const hasta=document.getElementById("fHasta")?.value||"";
     filtered=allGastos.filter(g=>{
+      if(g.tipo==="INGRESO") return false; // los ingresos no van en "Todos los gastos"
       const ms=!search||[g.categoria,g.subcategoria,g.tipo,g.descripcion,g.quienGasto].some(f=>f?.toLowerCase().includes(search));
       return ms&&(!cat||g.categoria===cat)&&(!usr||g.quienGasto===usr)&&(!desde||g.fecha>=desde)&&(!hasta||g.fecha<=hasta);
     });

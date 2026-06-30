@@ -112,6 +112,29 @@
     .form-control{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--sans);font-size:14px;padding:10px 14px;transition:border-color 0.15s;outline:none}
     .form-control:focus{border-color:var(--accent3)}
     .ingreso-big{font-family:var(--mono);font-size:32px;font-weight:700;color:#10b981;text-align:center;padding:12px 0 4px}
+
+    /* ── Pestañas Familiar / Personal ── */
+    .view-tabs{display:flex;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:20px;width:fit-content}
+    .view-tab{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:9px;border:none;background:none;color:var(--text-muted);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+    .view-tab.active{background:var(--accent);color:white;box-shadow:0 2px 10px rgba(108,99,255,.35)}
+    .view-tab:not(.active):hover{color:var(--text);background:var(--surface3)}
+    .view-tab i{font-size:14px}
+
+    /* ── Lista de ingresos acumulativos ── */
+    .ingreso-list{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;margin-bottom:16px}
+    .ingreso-item{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}
+    .ingreso-item-icon{width:30px;height:30px;border-radius:8px;background:#10b98122;color:#10b981;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+    .ingreso-item-info{flex:1;min-width:0}
+    .ingreso-item-name{font-size:13px;font-weight:600;color:var(--text)}
+    .ingreso-item-amount{font-family:var(--mono);font-size:14px;font-weight:700;color:#10b981}
+    .ingreso-item-del{background:none;border:none;color:var(--text-dim);cursor:pointer;padding:5px;border-radius:6px;font-size:14px;flex-shrink:0}
+    .ingreso-item-del:hover{color:#ef4444;background:#ef444415}
+    .ingreso-add-row{display:flex;gap:8px}
+    .ingreso-add-row input{flex:1}
+    .ingreso-total-bar{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#10b98112;border:1px solid #10b98130;border-radius:var(--radius-sm);margin-top:14px}
+    .ingreso-total-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+    .ingreso-total-value{font-family:var(--mono);font-size:20px;font-weight:700;color:#10b981}
+    .ingreso-empty{text-align:center;padding:20px;color:var(--text-dim);font-size:13px}
     @media(max-width:768px){
       .main-content{margin-left:0}
       .sidebar{transform:translateX(-100%);z-index:220}
@@ -170,6 +193,17 @@
     </header>
 
     <main class="page-content">
+
+      <!-- Pestañas Familiar / Personal -->
+      <div class="view-tabs" id="viewTabs">
+        <button class="view-tab active" id="tabFamiliar" onclick="switchView('familiar')">
+          <i class="bi bi-people-fill"></i> Familiar
+        </button>
+        <button class="view-tab" id="tabPersonal" onclick="switchView('personal')">
+          <i class="bi bi-person-fill"></i> Mis movimientos
+        </button>
+      </div>
+
       <!-- Fila superior: Ingresos · Gastos totales · Saldo restante -->
       <div class="stats-grid">
         <div class="stat-card ingreso-card" id="ingresoCard" onclick="openIngresoModal()" title="Hacer clic para editar ingresos">
@@ -192,7 +226,7 @@
       </div>
 
       <!-- Fila inferior: por usuario + cantidad -->
-      <div class="stats-grid-bottom">
+      <div class="stats-grid-bottom" id="rowPorUsuario">
         <div class="stat-card">
           <div class="stat-icon" id="statU1Icon"><i class="bi bi-person-fill"></i></div>
           <div class="stat-value" id="statU1">$0</div>
@@ -212,7 +246,7 @@
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:24px">
+      <div class="card" style="margin-bottom:24px" id="cardBalance">
         <div class="card-header">
           <div class="card-title"><i class="bi bi-bar-chart-line-fill"></i> Balance del mes</div>
           <span class="badge" id="balanceBadge">—</span>
@@ -229,7 +263,7 @@
           <div class="card-header"><div class="card-title"><i class="bi bi-pie-chart-fill"></i> Por categoría</div></div>
           <div class="chart-container"><canvas id="chartCategorias"></canvas></div>
         </div>
-        <div class="card">
+        <div class="card" id="cardPorUsuarioChart">
           <div class="card-header"><div class="card-title"><i class="bi bi-people-fill"></i> Por usuario</div></div>
           <div class="chart-container"><canvas id="chartUsuarios"></canvas></div>
         </div>
@@ -249,32 +283,40 @@
 
   <a href="nuevo.html" class="fab" title="Nuevo gasto"><i class="bi bi-plus-lg"></i></a>
 
-  <!-- Modal: Ingreso mensual -->
+  <!-- Modal: Ingresos del mes (acumulativo) -->
   <div class="modal-overlay" id="ingresoModal">
     <div class="modal-box">
       <div class="modal-header">
-        <div class="modal-title"><i class="bi bi-arrow-down-circle-fill" style="color:#10b981"></i> Ingreso del mes</div>
+        <div class="modal-title"><i class="bi bi-arrow-down-circle-fill" style="color:#10b981"></i> Ingresos del mes</div>
         <button class="btn-close-modal" onclick="closeIngresoModal()"><i class="bi bi-x-lg"></i></button>
       </div>
       <div class="modal-body">
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
-          Ingresá el total de ingresos de este mes. El saldo disponible se calcula restando todos los gastos del mes.
-        </p>
-        <div style="margin-bottom:16px">
+        <div style="margin-bottom:14px">
           <label class="form-label">Mes</label>
           <p id="ingresoMesLabel" style="font-size:14px;font-weight:600;color:var(--text);text-transform:capitalize"></p>
         </div>
-        <div>
-          <label class="form-label">Monto total (ARS)</label>
-          <input type="number" class="form-control" id="ingresoInput" placeholder="Ej: 500000" min="0" step="1"
-            style="font-family:var(--mono);font-size:18px;font-weight:700" />
+
+        <label class="form-label">Ingresos cargados</label>
+        <div class="ingreso-list" id="ingresoList">
+          <!-- generado por JS -->
+        </div>
+
+        <label class="form-label" style="margin-top:6px">Agregar ingreso</label>
+        <div class="ingreso-add-row">
+          <input type="text" class="form-control" id="ingresoNombreInput" placeholder="Ej: Sueldo, Freelance…" />
+          <input type="number" class="form-control" id="ingresoMontoInput" placeholder="Monto" min="0" step="1" style="max-width:140px;font-family:var(--mono)" />
+          <button class="btn btn-primary" style="background:#10b981;border-color:#10b981;padding:10px 14px" onclick="addIngreso()">
+            <i class="bi bi-plus-lg"></i>
+          </button>
+        </div>
+
+        <div class="ingreso-total-bar">
+          <span class="ingreso-total-label">Total del mes</span>
+          <span class="ingreso-total-value" id="ingresoTotalModal">$0</span>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeIngresoModal()">Cancelar</button>
-        <button class="btn btn-primary" style="background:#10b981;border-color:#10b981" onclick="saveIngreso()">
-          <i class="bi bi-check-lg"></i> Guardar ingreso
-        </button>
+        <button class="btn btn-secondary" onclick="closeIngresoModal()">Cerrar</button>
       </div>
     </div>
   </div>
@@ -334,10 +376,12 @@
   // ===== DASHBOARD =====
   const currentUser = requireAuth();
   let allGastos=[], chartCat=null, chartUsr=null, selectedYear, selectedMonth;
+  let currentView = localStorage.getItem("gastosapp_view") || "familiar"; // 'familiar' | 'personal'
   const now = new Date();
   selectedYear=now.getFullYear(); selectedMonth=now.getMonth()+1;
 
   initSidebar(); initUserBadge(); buildMonthPicker(); updateTopbarMonth();
+  applyViewUI(currentView); // aplica clases de pestañas y visibilidad sin re-renderizar aún
 
   // Carga desde localStorage al instante, sync en background
   (async function init(){
@@ -367,39 +411,158 @@
     if(navAdmin&&currentUser==="Roman") navAdmin.style.display="flex";
   }
 
-  // ===== INGRESOS =====
-  const LS_INGRESOS = "gastosapp_ingresos"; // { "2026-06": 500000, ... }
+  // ===== VISTA: Familiar vs Personal =====
+
+  function applyViewUI(view) {
+    document.getElementById("tabFamiliar").classList.toggle("active", view==="familiar");
+    document.getElementById("tabPersonal").classList.toggle("active", view==="personal");
+    const showFamiliarOnly = view === "familiar";
+    const rowU = document.getElementById("rowPorUsuario");
+    const cardBal = document.getElementById("cardBalance");
+    const cardChartU = document.getElementById("cardPorUsuarioChart");
+    if (rowU)      rowU.style.display      = showFamiliarOnly ? "grid" : "none";
+    if (cardBal)   cardBal.style.display   = showFamiliarOnly ? "block" : "none";
+    if (cardChartU) {
+      cardChartU.style.display = showFamiliarOnly ? "block" : "none";
+      cardChartU.parentElement.style.gridTemplateColumns = showFamiliarOnly ? "" : "1fr";
+    }
+  }
+
+  function switchView(view) {
+    currentView = view;
+    localStorage.setItem("gastosapp_view", view);
+    applyViewUI(view);
+    renderDashboard();
+  }
+
+  // ===== INGRESOS (acumulativo, separado por vista) =====
+  // Estructura: { "familiar": { "2026-06": [{id,nombre,monto}] }, "personal": { "Roman": { "2026-06": [...] } } }
+  const LS_INGRESOS = "gastosapp_ingresos_v2";
 
   function ingresoKey(y, m) { return `${y}-${String(m).padStart(2,"0")}`; }
-  function getIngreso(y, m) {
-    try { const d=JSON.parse(localStorage.getItem(LS_INGRESOS)||"{}"); return d[ingresoKey(y,m)]||0; } catch { return 0; }
+
+  function loadIngresosRaw() {
+    try { return JSON.parse(localStorage.getItem(LS_INGRESOS) || "{}"); } catch { return {}; }
   }
-  function setIngreso(y, m, val) {
+  function saveIngresosRaw(data) { localStorage.setItem(LS_INGRESOS, JSON.stringify(data)); }
+
+  // Migración: si existía el formato viejo (monto único familiar), lo convierte a un ingreso "Ingreso mensual"
+  (function migrarIngresosViejos() {
     try {
-      const d=JSON.parse(localStorage.getItem(LS_INGRESOS)||"{}");
-      d[ingresoKey(y,m)]=val;
-      localStorage.setItem(LS_INGRESOS, JSON.stringify(d));
+      const viejo = JSON.parse(localStorage.getItem("gastosapp_ingresos") || "null");
+      if (!viejo) return;
+      const data = loadIngresosRaw();
+      data.familiar = data.familiar || {};
+      Object.entries(viejo).forEach(([key, monto]) => {
+        if (monto > 0 && !data.familiar[key]) {
+          data.familiar[key] = [{ id: "mig_"+key, nombre: "Ingreso mensual", monto }];
+        }
+      });
+      saveIngresosRaw(data);
+      localStorage.removeItem("gastosapp_ingresos");
     } catch {}
+  })();
+
+  function getIngresosList(y, m) {
+    const data = loadIngresosRaw();
+    const key = ingresoKey(y, m);
+    if (currentView === "personal") {
+      data.personal = data.personal || {};
+      data.personal[currentUser] = data.personal[currentUser] || {};
+      return data.personal[currentUser][key] || [];
+    }
+    data.familiar = data.familiar || {};
+    return data.familiar[key] || [];
+  }
+
+  function getIngresoTotal(y, m) {
+    return getIngresosList(y, m).reduce((s, i) => s + (i.monto || 0), 0);
+  }
+
+  function addIngresoEntry(nombre, monto) {
+    const data = loadIngresosRaw();
+    const key = ingresoKey(selectedYear, selectedMonth);
+    const entry = { id: "ing_"+Date.now()+"_"+Math.random().toString(36).slice(2,7), nombre, monto };
+    if (currentView === "personal") {
+      data.personal = data.personal || {};
+      data.personal[currentUser] = data.personal[currentUser] || {};
+      data.personal[currentUser][key] = data.personal[currentUser][key] || [];
+      data.personal[currentUser][key].push(entry);
+    } else {
+      data.familiar = data.familiar || {};
+      data.familiar[key] = data.familiar[key] || [];
+      data.familiar[key].push(entry);
+    }
+    saveIngresosRaw(data);
+  }
+
+  function deleteIngresoEntry(id) {
+    const data = loadIngresosRaw();
+    const key = ingresoKey(selectedYear, selectedMonth);
+    if (currentView === "personal") {
+      const arr = data.personal?.[currentUser]?.[key];
+      if (arr) data.personal[currentUser][key] = arr.filter(i => i.id !== id);
+    } else {
+      const arr = data.familiar?.[key];
+      if (arr) data.familiar[key] = arr.filter(i => i.id !== id);
+    }
+    saveIngresosRaw(data);
+  }
+
+  function renderIngresoList() {
+    const list = getIngresosList(selectedYear, selectedMonth);
+    const container = document.getElementById("ingresoList");
+    if (!container) return;
+    if (list.length === 0) {
+      container.innerHTML = `<div class="ingreso-empty"><i class="bi bi-inbox" style="font-size:18px;display:block;margin-bottom:6px"></i>Sin ingresos cargados este mes</div>`;
+    } else {
+      container.innerHTML = list.map(i => `
+        <div class="ingreso-item">
+          <div class="ingreso-item-icon"><i class="bi bi-cash"></i></div>
+          <div class="ingreso-item-info">
+            <p class="ingreso-item-name">${i.nombre}</p>
+          </div>
+          <span class="ingreso-item-amount">${formatMoney(i.monto)}</span>
+          <button class="ingreso-item-del" onclick="removeIngresoAndRefresh('${i.id}')"><i class="bi bi-trash3"></i></button>
+        </div>`).join("");
+    }
+    const total = list.reduce((s,i)=>s+(i.monto||0),0);
+    setText("ingresoTotalModal", formatMoney(total));
+  }
+
+  function removeIngresoAndRefresh(id) {
+    deleteIngresoEntry(id);
+    renderIngresoList();
+    renderDashboard();
+  }
+
+  function addIngreso() {
+    const nombreEl = document.getElementById("ingresoNombreInput");
+    const montoEl  = document.getElementById("ingresoMontoInput");
+    const nombre = nombreEl.value.trim();
+    const monto  = parseFloat(montoEl.value);
+    if (!nombre) { showToast("Ingresá un nombre para el ingreso", "error"); return; }
+    if (!monto || monto <= 0) { showToast("Ingresá un monto válido", "error"); return; }
+    addIngresoEntry(nombre, monto);
+    nombreEl.value = ""; montoEl.value = "";
+    renderIngresoList();
+    renderDashboard();
+    nombreEl.focus();
   }
 
   function openIngresoModal() {
     const mes = new Intl.DateTimeFormat("es-AR",{month:"long",year:"numeric"}).format(new Date(selectedYear,selectedMonth-1,1));
     document.getElementById("ingresoMesLabel").textContent = mes.charAt(0).toUpperCase()+mes.slice(1);
-    const current = getIngreso(selectedYear, selectedMonth);
-    document.getElementById("ingresoInput").value = current || "";
+    renderIngresoList();
     document.getElementById("ingresoModal").classList.add("active");
-    setTimeout(()=>document.getElementById("ingresoInput").focus(), 100);
+    setTimeout(()=>document.getElementById("ingresoNombreInput").focus(), 100);
   }
   function closeIngresoModal() { document.getElementById("ingresoModal").classList.remove("active"); }
-  function saveIngreso() {
-    const val = parseFloat(document.getElementById("ingresoInput").value) || 0;
-    setIngreso(selectedYear, selectedMonth, val);
-    closeIngresoModal();
-    renderDashboard();
-    showToast("Ingreso guardado correctamente", "success");
-  }
-  // Cerrar con Escape
-  document.addEventListener("keydown", e => { if(e.key==="Escape") closeIngresoModal(); });
+  // Cerrar con Escape, agregar con Enter en el monto
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeIngresoModal();
+    if (e.key === "Enter" && (e.target.id === "ingresoNombreInput" || e.target.id === "ingresoMontoInput")) addIngreso();
+  });
   function buildMonthPicker() {
     const picker=document.getElementById("monthPicker"); if(!picker) return;
     picker.innerHTML="";
@@ -428,9 +591,15 @@
 
   function renderDashboard() {
     const prefix=`${selectedYear}-${String(selectedMonth).padStart(2,"0")}`;
-    const gastos=allGastos.filter(g=>g.fecha&&g.fecha.startsWith(prefix));
+    let gastos=allGastos.filter(g=>g.fecha&&g.fecha.startsWith(prefix));
+
+    // Vista personal: solo los gastos del usuario logueado
+    if (currentView === "personal") {
+      gastos = gastos.filter(g => g.quienGasto === currentUser);
+    }
+
     const total=gastos.reduce((s,g)=>s+(g.monto||0),0);
-    const ingreso=getIngreso(selectedYear,selectedMonth);
+    const ingreso=getIngresoTotal(selectedYear,selectedMonth);
     const saldo=ingreso-total;
 
     const perUser={};
@@ -438,6 +607,12 @@
     gastos.forEach(g=>{if(g.quienGasto) perUser[g.quienGasto]=(perUser[g.quienGasto]||0)+g.monto});
     const [u1,u2]=APP_CONFIG.usuarios;
     const m1=perUser[u1]||0, m2=perUser[u2]||0;
+
+    // Título de la card de ingresos según vista
+    const ingresoLabelEl = document.querySelector("#ingresoCard .stat-label");
+    if (ingresoLabelEl) ingresoLabelEl.textContent = currentView === "personal" ? "Mis ingresos del mes" : "Ingresos del mes";
+    const gastoLabelEl = document.querySelector("#statTotal").parentElement.querySelector(".stat-label");
+    if (gastoLabelEl) gastoLabelEl.textContent = currentView === "personal" ? "Mis gastos del mes" : "Gastos del mes";
 
     // Ingresos
     setText("statIngreso", formatMoney(ingreso));
@@ -466,14 +641,16 @@
       setText("statSaldoPct","Sin ingreso registrado");
     }
 
-    setText("statU1Label",u1); setText("statU2Label",u2);
-    setText("statU1",formatMoney(m1)); setText("statU2",formatMoney(m2));
-    setText("statU1Pct",total?`${((m1/total)*100).toFixed(0)}% del gasto`:"0%");
-    setText("statU2Pct",total?`${((m2/total)*100).toFixed(0)}% del gasto`:"0%");
+    if (currentView === "familiar") {
+      setText("statU1Label",u1); setText("statU2Label",u2);
+      setText("statU1",formatMoney(m1)); setText("statU2",formatMoney(m2));
+      setText("statU1Pct",total?`${((m1/total)*100).toFixed(0)}% del gasto`:"0%");
+      setText("statU2Pct",total?`${((m2/total)*100).toFixed(0)}% del gasto`:"0%");
+      setStyle("statU1Icon","background",`linear-gradient(135deg,${APP_CONFIG.coloresUsuarios[u1]},${APP_CONFIG.coloresUsuarios[u1]}88)`);
+      setStyle("statU2Icon","background",`linear-gradient(135deg,${APP_CONFIG.coloresUsuarios[u2]},${APP_CONFIG.coloresUsuarios[u2]}88)`);
+      renderBalance(m1,m2,u1,u2,total);
+    }
     setText("statCount",gastos.length);
-    setStyle("statU1Icon","background",`linear-gradient(135deg,${APP_CONFIG.coloresUsuarios[u1]},${APP_CONFIG.coloresUsuarios[u1]}88)`);
-    setStyle("statU2Icon","background",`linear-gradient(135deg,${APP_CONFIG.coloresUsuarios[u2]},${APP_CONFIG.coloresUsuarios[u2]}88)`);
-    renderBalance(m1,m2,u1,u2,total);
     renderCharts(gastos,u1,u2);
     renderLast(gastos.slice(0,5));
   }
